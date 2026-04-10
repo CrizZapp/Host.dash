@@ -1,86 +1,262 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud-Termux | Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        body { background: #0b0e14; color: #e2e8f0; font-family: 'Monaco', monospace; }
-        .glass { background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(10px); border: 1px solid #334155; }
-        .sidebar { width: 70px; transition: 0.3s; }
-        .sidebar:hover { width: 200px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Creador de páginas</title>
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f172a;
+      color: white;
+      margin: 0;
+      padding: 16px;
+    }
+    .contenedor {
+      max-width: 600px;
+      margin: auto;
+    }
+    .pantalla { display: none; }
+    .pantalla.activa { display: block; }
+    input, textarea, button {
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: none;
+    }
+    textarea {
+      height: 220px;
+      resize: vertical;
+    }
+    button {
+      background: #38bdf8;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .btn-publicar {
+      background: #22c55e;
+    }
+    .btn-ia {
+      background: #f59e0b; /* Color naranja para diferenciarlo */
+      color: white;
+    }
+    .loading { 
+      display: none; 
+      text-align: center; 
+      margin-top: 10px; 
+      color: #f59e0b; 
+      font-weight: bold; 
+    }
+  </style>
 </head>
-<body class="flex h-screen overflow-hidden">
+<body>
 
-    <aside class="sidebar bg-slate-900 border-r border-slate-800 flex flex-col items-center py-6 z-50">
-        <div class="mb-10 text-blue-500 text-2xl"><i class="fas fa-microchip"></i></div>
-        <nav class="flex-1 space-y-8">
-            <button class="text-blue-500 block"><i class="fas fa-server"></i></button>
-            <button onclick="logout()" class="text-red-500 block"><i class="fas fa-sign-out-alt"></i></button>
-        </nav>
-        <button onclick="location.href='panel.html'" class="text-slate-500 hover:text-white transition">
-            <i class="fas fa-cog"></i>
-        </button>
-    </aside>
+<div class="contenedor">
 
-    <main class="flex-1 overflow-y-auto p-6">
-        <header class="flex justify-between items-center mb-8">
-            <h1 class="text-2xl font-bold text-white">Mis Servidores</h1>
-            <button onclick="createProject()" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-bold text-sm transition">
-                + NUEVO SERVER
-            </button>
-        </header>
+  <div id="pantalla1" class="pantalla activa">
+    <h2>📱 Crea tu página</h2>
+    <input id="nombrePagina" placeholder="Nombre de tu página">
+    <button onclick="entrar()">Entrar</button>
+  </div>
 
-        <div id="dashList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            </div>
-    </main>
+  <div id="pantalla2" class="pantalla">
+    <h2 id="tituloPagina"></h2>
+    <textarea id="htmlInput" placeholder="Pegá el HTML de tu pagina aca..."></textarea>
+    <button onclick="verPagina(false)">👁 Ver</button>
+    <button class="btn-ia" onclick="irAIa()">✨ Generar con IA</button>
+    <button class="btn-publicar" onclick="verPagina(true)">🚀 Publicar</button>
+    <button onclick="nuevaPagina()">➕ Crear otra página</button>
+  </div>
 
-    <script>
-        // Simulación de Auth básica (puedes conectar Firebase Auth aquí)
-        if(!localStorage.getItem('user_session')) {
-            const user = prompt("Ingresa tu usuario:");
-            if(user) localStorage.setItem('user_session', user);
-            else location.reload();
-        }
+  <div id="pantallaIa" class="pantalla">
+    <h2>✨ Explícale a la IA...</h2>
+    <textarea id="iaPrompt" placeholder="Ej: Crea una página con fondo negro, texto verde neón que diga HOLA MUNDO y un botón rojo..."></textarea>
+    <div id="loader" class="loading">La IA está escribiendo el código... ⏳</div>
+    <button class="btn-ia" id="btnGen" onclick="generarGratis()">Generar ahora</button>
+    <button style="background:#475569; color:white;" onclick="irAEditor()">⬅ Volver al Editor</button>
+  </div>
 
-        const DB = "https://ingresa-dfec2-default-rtdb.firebaseio.com/dominios.json";
+</div>
 
-        async function loadDash() {
-            const r = await fetch(DB);
-            const data = await r.json() || {};
-            const cont = document.getElementById('dashList');
-            cont.innerHTML = Object.entries(data).map(([id, p]) => `
-                <div class="glass p-6 rounded-2xl relative group">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="w-12 h-12 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-500">
-                            <i class="fas fa-terminal"></i>
-                        </div>
-                        <span class="text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-400 uppercase tracking-tighter">${id.slice(-5)}</span>
-                    </div>
-                    <h3 class="font-bold text-lg">${p.nombre}</h3>
-                    <p class="text-xs text-slate-500 mb-4">Status: <span class="${p.status === 'start' ? 'text-green-500' : 'text-red-500'}">${p.status}</span></p>
-                    
-                    <div class="flex gap-2">
-                        <button onclick="location.href='panel.html?id=${id}'" class="flex-1 bg-slate-800 hover:bg-slate-700 p-2 rounded-lg text-xs font-bold transition">
-                            ADMINISTRAR
-                        </button>
-                        <button onclick="location.href='panel.html?id=${id}&tab=editor'" class="bg-slate-800 hover:bg-slate-700 p-2 px-3 rounded-lg text-xs transition">
-                            <i class="fas fa-code"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-        }
+<script>
+  let nombre = "";
 
-        function logout() {
-            localStorage.removeItem('user_session');
-            location.reload();
-        }
+  // Cargar borrador si existe
+  window.onload = () => {
+    const draftNombre = localStorage.getItem("draft_nombre");
+    const draftHtml = localStorage.getItem("draft_html");
 
-        loadDash();
-    </script>
+    if (draftNombre && draftHtml) {
+      nombre = draftNombre;
+      nombrePagina.value = draftNombre;
+      htmlInput.value = draftHtml;
+      tituloPagina.innerText = "Editando: " + nombre;
+
+      pantalla1.classList.remove("activa");
+      pantalla2.classList.add("activa");
+    }
+  };
+
+  function entrar() {
+    nombre = nombrePagina.value.trim();
+    if (!nombre) return alert("Poné un nombre");
+    localStorage.setItem("draft_nombre", nombre);
+    tituloPagina.innerText = "Editando: " + nombre;
+    pantalla1.classList.remove("activa");
+    pantalla2.classList.add("activa");
+  }
+
+  // Funciones de navegación
+  function irAIa() {
+    pantalla2.classList.remove("activa");
+    pantallaIa.classList.add("activa");
+  }
+
+  function irAEditor() {
+    pantallaIa.classList.remove("activa");
+    pantalla2.classList.add("activa");
+  }
+
+  // MOTOR IA (Gratis y sin API Keys)
+  async function generarGratis() {
+    const promptUser = document.getElementById('iaPrompt').value;
+    if (!promptUser) return alert("Dime qué quieres que haga la IA");
+
+    const btn = document.getElementById('btnGen');
+    const loader = document.getElementById('loader');
+    btn.disabled = true;
+    loader.style.display = "block";
+
+    try {
+      const response = await fetch("https://text.pollinations.ai/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            { role: "system", content: "Eres un experto en HTML y CSS. Responde SOLO con el código solicitado. Sin explicaciones, sin markdown." },
+            { role: "user", content: `Genera el código HTML y CSS para una página llamada ${nombre}. Requisito: ${promptUser}` }
+          ],
+          model: "openai"
+        })
+      });
+
+      const texto = await response.text();
+      let codigoLimpio = texto.replace(/```html|```css|```/gi, "").trim();
+      
+      document.getElementById('htmlInput').value = codigoLimpio;
+      localStorage.setItem("draft_html", codigoLimpio);
+      
+      alert("¡Código generado!");
+      irAEditor(); // Vuelve al editor para que el usuario pueda ver, editar o publicar
+
+    } catch (error) {
+      alert("Error al conectar. Intenta de nuevo.");
+    } finally {
+      btn.disabled = false;
+      loader.style.display = "none";
+    }
+  }
+
+  function verPagina(publicado) {
+    localStorage.setItem("draft_html", htmlInput.value);
+
+    if (publicado) {
+      localStorage.setItem("page_" + nombre, htmlInput.value);
+      location.hash = nombre;
+    }
+
+    abrirVista(htmlInput.value, publicado);
+  }
+
+  function nuevaPagina() {
+    if (!confirm("¿Crear una página nueva? Se perderá el borrador actual.")) return;
+    localStorage.removeItem("draft_nombre");
+    localStorage.removeItem("draft_html");
+    location.hash = "";
+    location.reload();
+  }
+
+  function abrirVista(html, publicado) {
+    document.open();
+    document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${nombre}</title>
+<style>
+body { margin:0; font-family:system-ui; }
+#barra {
+  position:fixed;
+  top:10px;
+  left:10px;
+  display:flex;
+  gap:10px;
+  z-index:9999;
+  transition: opacity 0.3s ease;
+}
+.btn {
+  background:black;
+  color:white;
+  padding:10px 14px;
+  border-radius:10px;
+  font-weight:bold;
+  cursor:pointer;
+}
+#toggleBtn {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  z-index: 10000;
+  user-select: none;
+}
+</style>
+</head>
+<body>
+<div id="barra">
+  ${publicado ? "" : `<div class="btn" onclick="location.reload()">⬅ Editor</div>`}
+  <div class="btn" onclick="compartir()">📤 Compartir</div>
+</div>
+<div id="toggleBtn" onclick="toggleBar()">👁️</div>
+${html}
+<script>
+function compartir() {
+  const url = location.href;
+  if (navigator.share) {
+    navigator.share({ title: document.title, url });
+  } else {
+    navigator.clipboard.writeText(url);
+    alert("Link copiado");
+  }
+}
+function toggleBar() {
+  const barra = document.getElementById('barra');
+  const toggle = document.getElementById('toggleBtn');
+  if (barra.style.opacity === '0') {
+    barra.style.opacity = '1';
+    barra.style.pointerEvents = 'auto';
+    toggle.textContent = '👁️';
+  } else {
+    barra.style.opacity = '0';
+    barra.style.pointerEvents = 'none';
+    toggle.textContent = '🙈';
+  }
+}
+<\/script>
+</body>
+</html>`);
+    document.close();
+  }
+</script>
+
 </body>
 </html>
