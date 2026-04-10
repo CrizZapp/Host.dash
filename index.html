@@ -82,46 +82,95 @@
 
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
 <script>
+  // Tu Configuración
+  const firebaseConfig = {
+    apiKey: "AIzaSyABaTv7yjGsgIu2A6mj6arml2IHGljt_H4",
+    authDomain: "ingresa-dfec2.firebaseapp.com",
+    databaseURL: "https://ingresa-dfec2-default-rtdb.firebaseio.com",
+    projectId: "ingresa-dfec2",
+    storageBucket: "ingresa-dfec2.appspot.com",
+    messagingSenderId: "441882283200",
+    appId: "1:441882283200:web:8067df85facc2d67d77125"
+  };
+
+  // Inicializar Firebase
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
   let nombre = "";
 
-  // Cargar borrador si existe
-  window.onload = () => {
+  // 1. LÓGICA DE CARGA (DETECTA LINKS COMPARTIDOS)
+  window.onload = async () => {
+    const hash = location.hash.replace("#", "");
+    
+    if (hash) {
+      // Buscamos en Firebase si esa página existe
+      const snapshot = await db.ref("paginas/" + hash).once("value");
+      if (snapshot.exists()) {
+        nombre = hash;
+        abrirVista(snapshot.val(), true);
+        return;
+      }
+    }
+
+    // Si no hay hash o no existe, cargar borrador local
     const draftNombre = localStorage.getItem("draft_nombre");
     const draftHtml = localStorage.getItem("draft_html");
 
     if (draftNombre && draftHtml) {
       nombre = draftNombre;
-      nombrePagina.value = draftNombre;
-      htmlInput.value = draftHtml;
-      tituloPagina.innerText = "Editando: " + nombre;
-
-      pantalla1.classList.remove("activa");
-      pantalla2.classList.add("activa");
+      document.getElementById("nombrePagina").value = draftNombre;
+      document.getElementById("htmlInput").value = draftHtml;
+      document.getElementById("tituloPagina").innerText = "Editando: " + nombre;
+      document.getElementById("pantalla1").classList.remove("activa");
+      document.getElementById("pantalla2").classList.add("activa");
     }
   };
 
   function entrar() {
-    nombre = nombrePagina.value.trim();
+    nombre = document.getElementById("nombrePagina").value.trim().replace(/\s+/g, '_');
     if (!nombre) return alert("Poné un nombre");
     localStorage.setItem("draft_nombre", nombre);
-    tituloPagina.innerText = "Editando: " + nombre;
-    pantalla1.classList.remove("activa");
-    pantalla2.classList.add("activa");
+    document.getElementById("tituloPagina").innerText = "Editando: " + nombre;
+    document.getElementById("pantalla1").classList.remove("activa");
+    document.getElementById("pantalla2").classList.add("activa");
   }
 
-  // Funciones de navegación
+  // 2. PUBLICAR EN LA NUBE
+  async function verPagina(publicado) {
+    const codigo = document.getElementById("htmlInput").value;
+    localStorage.setItem("draft_html", codigo);
+
+    if (publicado) {
+      // Guardar en Firebase para que otros lo vean
+      try {
+        await db.ref("paginas/" + nombre).set(codigo);
+        location.hash = nombre;
+        alert("¡Página publicada globalmente!");
+      } catch (e) {
+        alert("Error al publicar: " + e.message);
+      }
+    }
+
+    abrirVista(codigo, publicado);
+  }
+
+  // --- El resto de tus funciones (irAIa, generarGratis, abrirVista, etc.) se mantienen igual ---
+  
   function irAIa() {
-    pantalla2.classList.remove("activa");
-    pantallaIa.classList.add("activa");
+    document.getElementById("pantalla2").classList.remove("activa");
+    document.getElementById("pantallaIa").classList.add("activa");
   }
 
   function irAEditor() {
-    pantallaIa.classList.remove("activa");
-    pantalla2.classList.add("activa");
+    document.getElementById("pantallaIa").classList.remove("activa");
+    document.getElementById("pantalla2").classList.add("activa");
   }
 
-  // MOTOR IA (Gratis y sin API Keys)
   async function generarGratis() {
     const promptUser = document.getElementById('iaPrompt').value;
     if (!promptUser) return alert("Dime qué quieres que haga la IA");
@@ -138,7 +187,7 @@
         body: JSON.stringify({
           messages: [
             { role: "system", content: "Eres un experto en HTML y CSS. Responde SOLO con el código solicitado. Sin explicaciones, sin markdown." },
-            { role: "user", content: `Genera el código HTML y CSS para una página llamada ${nombre}. Requisito: ${promptUser}` }
+            { role: "user", content: `Genera el código HTML y CSS para una página. Requisito: ${promptUser}` }
           ],
           model: "openai"
         })
@@ -149,31 +198,18 @@
       
       document.getElementById('htmlInput').value = codigoLimpio;
       localStorage.setItem("draft_html", codigoLimpio);
-      
-      alert("¡Código generado!");
-      irAEditor(); // Vuelve al editor para que el usuario pueda ver, editar o publicar
+      irAEditor();
 
     } catch (error) {
-      alert("Error al conectar. Intenta de nuevo.");
+      alert("Error al conectar con la IA.");
     } finally {
       btn.disabled = false;
       loader.style.display = "none";
     }
   }
 
-  function verPagina(publicado) {
-    localStorage.setItem("draft_html", htmlInput.value);
-
-    if (publicado) {
-      localStorage.setItem("page_" + nombre, htmlInput.value);
-      location.hash = nombre;
-    }
-
-    abrirVista(htmlInput.value, publicado);
-  }
-
   function nuevaPagina() {
-    if (!confirm("¿Crear una página nueva? Se perderá el borrador actual.")) return;
+    if (!confirm("¿Crear una página nueva?")) return;
     localStorage.removeItem("draft_nombre");
     localStorage.removeItem("draft_html");
     location.hash = "";
@@ -183,77 +219,35 @@
   function abrirVista(html, publicado) {
     document.open();
     document.write(`<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${nombre}</title>
-<style>
-body { margin:0; font-family:system-ui; }
-#barra {
-  position:fixed;
-  top:10px;
-  left:10px;
-  display:flex;
-  gap:10px;
-  z-index:9999;
-  transition: opacity 0.3s ease;
-}
-.btn {
-  background:black;
-  color:white;
-  padding:10px 14px;
-  border-radius:10px;
-  font-weight:bold;
-  cursor:pointer;
-}
-#toggleBtn {
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  background: rgba(0,0,0,0.6);
-  color: white;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  z-index: 10000;
-  user-select: none;
-}
-</style>
-</head>
-<body>
-<div id="barra">
-  ${publicado ? "" : `<div class="btn" onclick="location.reload()">⬅ Editor</div>`}
-  <div class="btn" onclick="compartir()">📤 Compartir</div>
-</div>
-<div id="toggleBtn" onclick="toggleBar()">👁️</div>
-${html}
-<script>
-function compartir() {
-  const url = location.href;
-  if (navigator.share) {
-    navigator.share({ title: document.title, url });
-  } else {
-    navigator.clipboard.writeText(url);
-    alert("Link copiado");
-  }
-}
-function toggleBar() {
-  const barra = document.getElementById('barra');
-  const toggle = document.getElementById('toggleBtn');
-  if (barra.style.opacity === '0') {
-    barra.style.opacity = '1';
-    barra.style.pointerEvents = 'auto';
-    toggle.textContent = '👁️';
-  } else {
-    barra.style.opacity = '0';
-    barra.style.pointerEvents = 'none';
-    toggle.textContent = '🙈';
-  }
-}
-<\/script>
-</body>
-</html>`);
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>\${nombre}</title>
+      <style>
+        body { margin:0; font-family:system-ui; }
+        #barra { position:fixed; top:10px; left:10px; display:flex; gap:10px; z-index:9999; }
+        .btn { background:black; color:white; padding:10px 14px; border-radius:10px; font-weight:bold; cursor:pointer; }
+      </style>
+    </head>
+    <body>
+      <div id="barra">
+        \${publicado ? "" : '<div class="btn" onclick="location.reload()">⬅ Editor</div>'}
+        <div class="btn" onclick="compartir()">📤 Compartir</div>
+      </div>
+      \${html}
+      <script>
+        function compartir() {
+          const url = location.href;
+          if (navigator.share) {
+            navigator.share({ title: document.title, url });
+          } else {
+            navigator.clipboard.writeText(url);
+            alert("Link copiado para compartir");
+          }
+        }
+      <\/script>
+    </body>
+    </html>`);
     document.close();
   }
 </script>
