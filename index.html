@@ -41,7 +41,7 @@
       background: #22c55e;
     }
     .btn-ia {
-      background: #f59e0b; /* Color naranja para diferenciarlo */
+      background: #f59e0b;
       color: white;
     }
     .loading { 
@@ -74,7 +74,7 @@
 
   <div id="pantallaIa" class="pantalla">
     <h2>✨ Explícale a la IA...</h2>
-    <textarea id="iaPrompt" placeholder="Ej: Crea una página con fondo negro, texto verde neón que diga HOLA MUNDO y un botón rojo..."></textarea>
+    <textarea id="iaPrompt" placeholder="Ej: Una landing page oscura con luces neon..."></textarea>
     <div id="loader" class="loading">La IA está escribiendo el código... ⏳</div>
     <button class="btn-ia" id="btnGen" onclick="generarGratis()">Generar ahora</button>
     <button style="background:#475569; color:white;" onclick="irAEditor()">⬅ Volver al Editor</button>
@@ -86,7 +86,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
 
 <script>
-  // Tu Configuración
   const firebaseConfig = {
     apiKey: "AIzaSyABaTv7yjGsgIu2A6mj6arml2IHGljt_H4",
     authDomain: "ingresa-dfec2.firebaseapp.com",
@@ -97,18 +96,14 @@
     appId: "1:441882283200:web:8067df85facc2d67d77125"
   };
 
-  // Inicializar Firebase
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
   let nombre = "";
 
-  // 1. LÓGICA DE CARGA (DETECTA LINKS COMPARTIDOS)
   window.onload = async () => {
     const hash = location.hash.replace("#", "");
-    
     if (hash) {
-      // Buscamos en Firebase si esa página existe
       const snapshot = await db.ref("paginas/" + hash).once("value");
       if (snapshot.exists()) {
         nombre = hash;
@@ -117,7 +112,6 @@
       }
     }
 
-    // Si no hay hash o no existe, cargar borrador local
     const draftNombre = localStorage.getItem("draft_nombre");
     const draftHtml = localStorage.getItem("draft_html");
 
@@ -140,27 +134,6 @@
     document.getElementById("pantalla2").classList.add("activa");
   }
 
-  // 2. PUBLICAR EN LA NUBE
-  async function verPagina(publicado) {
-    const codigo = document.getElementById("htmlInput").value;
-    localStorage.setItem("draft_html", codigo);
-
-    if (publicado) {
-      // Guardar en Firebase para que otros lo vean
-      try {
-        await db.ref("paginas/" + nombre).set(codigo);
-        location.hash = nombre;
-        alert("¡Página publicada globalmente!");
-      } catch (e) {
-        alert("Error al publicar: " + e.message);
-      }
-    }
-
-    abrirVista(codigo, publicado);
-  }
-
-  // --- El resto de tus funciones (irAIa, generarGratis, abrirVista, etc.) se mantienen igual ---
-  
   function irAIa() {
     document.getElementById("pantalla2").classList.remove("activa");
     document.getElementById("pantallaIa").classList.add("activa");
@@ -195,21 +168,35 @@
 
       const texto = await response.text();
       let codigoLimpio = texto.replace(/```html|```css|```/gi, "").trim();
-      
       document.getElementById('htmlInput').value = codigoLimpio;
       localStorage.setItem("draft_html", codigoLimpio);
       irAEditor();
-
     } catch (error) {
-      alert("Error al conectar con la IA.");
+      alert("Error con la IA.");
     } finally {
       btn.disabled = false;
       loader.style.display = "none";
     }
   }
 
+  async function verPagina(publicado) {
+    const codigo = document.getElementById("htmlInput").value;
+    localStorage.setItem("draft_html", codigo);
+
+    if (publicado) {
+      try {
+        await db.ref("paginas/" + nombre).set(codigo);
+        location.hash = nombre;
+        alert("¡Publicado! Ya puedes compartir el link.");
+      } catch (e) {
+        alert("Error al guardar en la nube.");
+      }
+    }
+    abrirVista(codigo, publicado);
+  }
+
   function nuevaPagina() {
-    if (!confirm("¿Crear una página nueva?")) return;
+    if (!confirm("¿Nueva página?")) return;
     localStorage.removeItem("draft_nombre");
     localStorage.removeItem("draft_html");
     location.hash = "";
@@ -217,12 +204,14 @@
   }
 
   function abrirVista(html, publicado) {
+    const editorBtn = publicado ? "" : '<div class="btn" onclick="location.reload()">⬅ Editor</div>';
+    
     document.open();
     document.write(`<!DOCTYPE html>
     <html>
     <head>
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>\${nombre}</title>
+      <title>${nombre}</title>
       <style>
         body { margin:0; font-family:system-ui; }
         #barra { position:fixed; top:10px; left:10px; display:flex; gap:10px; z-index:9999; }
@@ -231,10 +220,10 @@
     </head>
     <body>
       <div id="barra">
-        \${publicado ? "" : '<div class="btn" onclick="location.reload()">⬅ Editor</div>'}
+        ${editorBtn}
         <div class="btn" onclick="compartir()">📤 Compartir</div>
       </div>
-      \${html}
+      ${html}
       <script>
         function compartir() {
           const url = location.href;
@@ -242,7 +231,7 @@
             navigator.share({ title: document.title, url });
           } else {
             navigator.clipboard.writeText(url);
-            alert("Link copiado para compartir");
+            alert("Link copiado");
           }
         }
       <\/script>
@@ -251,6 +240,5 @@
     document.close();
   }
 </script>
-
 </body>
 </html>
