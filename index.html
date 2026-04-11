@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -8,39 +8,67 @@
     * { box-sizing: border-box; }
     body { font-family: system-ui, sans-serif; background: #0f172a; color: white; margin: 0; padding: 16px; }
     .contenedor { max-width: 600px; margin: auto; }
+    
     .pantalla { display: none; }
     .pantalla.activa { display: block; }
+    
     input, textarea, button { width: 100%; margin-top: 12px; padding: 12px; font-size: 16px; border-radius: 10px; border: none; }
     textarea { height: 220px; resize: vertical; }
-    button { background: #38bdf8; font-weight: bold; cursor: pointer; color: #000; }
+    button { background: #38bdf8; font-weight: bold; cursor: pointer; color: #000; transition: transform 0.1s, opacity 0.2s; }
+    button:active { transform: scale(0.98); }
     .btn-publicar { background: #22c55e; color: white; }
     .btn-ia { background: #f59e0b; color: white; }
+    
     .loading { display: none; text-align: center; margin-top: 10px; color: #f59e0b; font-weight: bold; }
-.animacion-latido {
-  animation: latido 1.5s infinite;
-  color: #38bdf8;
-}
 
-@keyframes latido {
-  0% { opacity: 0.4; transform: scale(0.98); }
-  50% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0.4; transform: scale(0.98); }
-}
+    /* NUEVO DISEÑO DE CARGA - Más limpio y moderno */
+    .pantalla-centrada {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 70vh;
+      text-align: center;
+    }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(56, 189, 248, 0.15);
+      border-left-color: #38bdf8;
+      border-radius: 50%;
+      animation: girar 1s linear infinite;
+      margin-bottom: 24px;
+    }
+
+    @keyframes girar {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .titulo-carga { color: #f8fafc; margin: 0 0 8px 0; font-size: 1.5rem; }
+    .texto-carga { color: #94a3b8; margin: 0; font-size: 1rem; }
+
+    /* Estilos para el error */
+    .icono-error { font-size: 3rem; margin-bottom: 16px; }
 
   </style>
 </head>
 <body>
 
 <div id="pantallaCarga" class="pantalla">
-  <div style="text-align: center; margin-top: 50px;">
+  <div class="pantalla-centrada">
     <div id="estadoCarga">
-      <h2 class="animacion-latido">Cargando proyecto...</h2>
-      <p>Buscando en la base de datos de CrizZapp</p>
+      <div class="spinner" style="margin: 0 auto 24px auto;"></div>
+      <h2 class="titulo-carga">Cargando proyecto</h2>
+      <p class="texto-carga">Conectando con la base de datos...</p>
     </div>
+    
     <div id="estadoError" style="display:none;">
-      <h2>⚠️ Proyecto no encontrado</h2>
-      <p>El link es incorrecto o la página fue eliminada.</p>
-      <button onclick="location.hash=''; location.reload()">Crear mi propia página</button>
+      <div class="icono-error">⚠️</div>
+      <h2 class="titulo-carga">Proyecto no encontrado</h2>
+      <p class="texto-carga">El link es incorrecto o la página fue eliminada.</p>
+      <button style="margin-top: 24px;" onclick="location.hash=''; location.reload()">Crear mi propia página</button>
     </div>
   </div>
 </div>
@@ -89,42 +117,45 @@
   let nombreGlobal = "";
 
   // CARGA INICIAL
-window.onload = async () => {
-  const hash = window.location.hash.replace("#", "");
-  
-  if (hash) {
-    // Mostramos pantalla de carga inmediatamente
-    document.getElementById("pantalla1").classList.remove("activa");
-    document.getElementById("pantallaCarga").classList.add("activa");
+  window.onload = async () => {
+    const hash = window.location.hash.replace("#", "");
+    
+    if (hash) {
+      document.getElementById("pantalla1").classList.remove("activa");
+      document.getElementById("pantallaCarga").classList.add("activa");
 
-    try {
-      const snapshot = await db.ref("paginas/" + hash).once("value");
-      if (snapshot.exists()) {
-        nombreGlobal = hash;
-        abrirVista(snapshot.val(), true);
-      } else {
-        // Si no existe, cambiamos el mensaje de carga por el de error
-        document.getElementById("estadoCarga").style.display = "none";
-        document.getElementById("estadoError").style.display = "block";
+      try {
+        // Agregamos un delay artificial de 1 segundo para que la animación se vea bien
+        // y no de un pantallazo brusco si el internet es muy rápido.
+        const [snapshot] = await Promise.all([
+          db.ref("paginas/" + hash).once("value"),
+          new Promise(resolve => setTimeout(resolve, 1000)) 
+        ]);
+
+        if (snapshot.exists()) {
+          nombreGlobal = hash;
+          abrirVista(snapshot.val(), true);
+        } else {
+          document.getElementById("estadoCarga").style.display = "none";
+          document.getElementById("estadoError").style.display = "block";
+        }
+      } catch (e) {
+        alert("Error de conexión");
       }
-    } catch (e) {
-      alert("Error de conexión");
+      return; 
     }
-    return; // Detenemos la ejecución aquí si hay hash
-  }
 
-  // Si no hay hash, cargamos el editor normal o el borrador
-  const dNombre = localStorage.getItem("draft_nombre");
-  const dHtml = localStorage.getItem("draft_html");
-  if (dNombre) {
-    nombreGlobal = dNombre;
-    document.getElementById("nombrePagina").value = dNombre;
-    document.getElementById("htmlInput").value = dHtml || "";
-    document.getElementById("tituloPagina").innerText = "Editando: " + dNombre;
-    document.getElementById("pantalla1").classList.remove("activa");
-    document.getElementById("pantalla2").classList.add("activa");
-  }
-};
+    const dNombre = localStorage.getItem("draft_nombre");
+    const dHtml = localStorage.getItem("draft_html");
+    if (dNombre) {
+      nombreGlobal = dNombre;
+      document.getElementById("nombrePagina").value = dNombre;
+      document.getElementById("htmlInput").value = dHtml || "";
+      document.getElementById("tituloPagina").innerText = "Editando: " + dNombre;
+      document.getElementById("pantalla1").classList.remove("activa");
+      document.getElementById("pantalla2").classList.add("activa");
+    }
+  };
 
 
   function entrar() {
