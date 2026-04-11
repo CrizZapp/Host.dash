@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -16,9 +16,34 @@
     .btn-publicar { background: #22c55e; color: white; }
     .btn-ia { background: #f59e0b; color: white; }
     .loading { display: none; text-align: center; margin-top: 10px; color: #f59e0b; font-weight: bold; }
+.animacion-latido {
+  animation: latido 1.5s infinite;
+  color: #38bdf8;
+}
+
+@keyframes latido {
+  0% { opacity: 0.4; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0.4; transform: scale(0.98); }
+}
+
   </style>
 </head>
 <body>
+
+<div id="pantallaCarga" class="pantalla">
+  <div style="text-align: center; margin-top: 50px;">
+    <div id="estadoCarga">
+      <h2 class="animacion-latido">Cargando proyecto...</h2>
+      <p>Buscando en la base de datos de CrizZapp</p>
+    </div>
+    <div id="estadoError" style="display:none;">
+      <h2>⚠️ Proyecto no encontrado</h2>
+      <p>El link es incorrecto o la página fue eliminada.</p>
+      <button onclick="location.hash=''; location.reload()">Crear mi propia página</button>
+    </div>
+  </div>
+</div>
 
 <div class="contenedor">
   <div id="pantalla1" class="pantalla activa">
@@ -64,28 +89,43 @@
   let nombreGlobal = "";
 
   // CARGA INICIAL
-  window.onload = async () => {
-    const hash = window.location.hash.replace("#", "");
-    if (hash) {
+window.onload = async () => {
+  const hash = window.location.hash.replace("#", "");
+  
+  if (hash) {
+    // Mostramos pantalla de carga inmediatamente
+    document.getElementById("pantalla1").classList.remove("activa");
+    document.getElementById("pantallaCarga").classList.add("activa");
+
+    try {
       const snapshot = await db.ref("paginas/" + hash).once("value");
       if (snapshot.exists()) {
         nombreGlobal = hash;
         abrirVista(snapshot.val(), true);
-        return;
+      } else {
+        // Si no existe, cambiamos el mensaje de carga por el de error
+        document.getElementById("estadoCarga").style.display = "none";
+        document.getElementById("estadoError").style.display = "block";
       }
+    } catch (e) {
+      alert("Error de conexión");
     }
+    return; // Detenemos la ejecución aquí si hay hash
+  }
 
-    const dNombre = localStorage.getItem("draft_nombre");
-    const dHtml = localStorage.getItem("draft_html");
-    if (dNombre) {
-      nombreGlobal = dNombre;
-      document.getElementById("nombrePagina").value = dNombre;
-      document.getElementById("htmlInput").value = dHtml || "";
-      document.getElementById("tituloPagina").innerText = "Editando: " + dNombre;
-      document.getElementById("pantalla1").classList.remove("activa");
-      document.getElementById("pantalla2").classList.add("activa");
-    }
-  };
+  // Si no hay hash, cargamos el editor normal o el borrador
+  const dNombre = localStorage.getItem("draft_nombre");
+  const dHtml = localStorage.getItem("draft_html");
+  if (dNombre) {
+    nombreGlobal = dNombre;
+    document.getElementById("nombrePagina").value = dNombre;
+    document.getElementById("htmlInput").value = dHtml || "";
+    document.getElementById("tituloPagina").innerText = "Editando: " + dNombre;
+    document.getElementById("pantalla1").classList.remove("activa");
+    document.getElementById("pantalla2").classList.add("activa");
+  }
+};
+
 
   function entrar() {
     nombreGlobal = document.getElementById("nombrePagina").value.trim().replace(/\s+/g, '_');
